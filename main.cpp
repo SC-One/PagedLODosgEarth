@@ -23,6 +23,7 @@
 #include <osg/PositionAttitudeTransform>
 #include <osgDB/ReadFile>
 #include <osgDB/WriteFile>
+//#include <osgEarth/AutoScaleCallback>
 #include <osgEarth/Composite>
 #include <osgEarth/EarthManipulator>
 #include <osgEarth/ExampleResources>
@@ -53,6 +54,7 @@ int usage(int argc, char** argv) {
 // for use in a layer.
 class MyTextureLayer : public ImageLayer {
  public:
+  std::string GLOBAL_GEODETIC = "global-geodetic";
   std::string _path;
   osg::ref_ptr<osg::Texture2D> _tex;
 
@@ -68,7 +70,7 @@ class MyTextureLayer : public ImageLayer {
       return Status(Status::ConfigurationError, "no path");
 
     // Establish a geospatial profile for the layer:
-    setProfile(Profile::create(ProfileOptions()));
+    setProfile(Profile::create(GLOBAL_GEODETIC));
 
     // Tell the layer to call createTexture:
     setUseCreateTexture();
@@ -107,90 +109,47 @@ int main(int argc, char** argv) {
   // create the empty map.
   Map* map = new Map();
 
-  // add a TMS imagery layer:
-  //  TMSImageLayer* imagery = new TMSImageLayer();
-  //  imagery->setURL("http://readymap.org/readymap/tiles/1.0.0/7/");
-  //  map->addLayer(imagery);
-
-  // add a TMS elevation layer:
-  //  TMSElevationLayer* elevation = new TMSElevationLayer();
-  //  elevation->setURL("http://readymap.org/readymap/tiles/1.0.0/116/");
-  //  map->addLayer(elevation);
-
-  //  // add a semi-transparent XYZ layer:
-  //  XYZImageLayer* osm = new XYZImageLayer();
-  //  osm->setURL("http://[abc].tile.openstreetmap.org/{z}/{x}/{y}.png");
-  //  osm->setProfile(Profile::create(ProfileOptions()));
-  //  osm->setOpacity(0.5f);
-  //  map->addLayer(osm);
-
-  //  // a custom layer that displays a user texture:
-  //  MyTextureLayer* texLayer = new MyTextureLayer();
-  //  texLayer->setPath("../data/grid2.png");
-  //  texLayer->setOpacity(0.5f);
-  //  map->addLayer(texLayer);
-
   // add a WMS radar layer with transparency, and disable caching since
   // this layer updates on the server periodically.
-  WMSImageLayer* wms = new WMSImageLayer();
-  wms->setURL("http://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0r.cgi");
-  wms->setFormat("png");
-  wms->setLayers("nexrad-n0r");
-  wms->setSRS("EPSG:4326");
-  wms->setTransparent(true);
-  wms->options().cachePolicy() = CachePolicy::NO_CACHE;
-  map->addLayer(wms);
-
+  //  WMSImageLayer* wms = new WMSImageLayer();
+  //  wms->setURL("http://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0r.cgi");
+  //  wms->setFormat("png");
+  //  wms->setLayers("nexrad-n0r");
+  //  wms->setSRS("EPSG:4326");
+  //  wms->setTransparent(true);
+  //  wms->options().cachePolicy() = CachePolicy::NO_CACHE;
+  //  map->addLayer(wms);
   // Add a local simple image as a layer. You can use the GDAL driver for this,
   // but since a GIF has no spatial reference information, you have to assign a
   // geospatial Profile so that osgEarth knows where to render it on the map.
+  std::string FOLDER =
+      "/home/sc/QT_PROJECTS/OSG_Earth_PagedLOD/osgEarthPagedLOD/";
+
+  /////////////////////////////////////////////////@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+  // a custom layer that displays a user texture:
+  MyTextureLayer* texLayer = new MyTextureLayer();
+  texLayer->setPath((FOLDER + "grid.png").c_str());
+  texLayer->setOpacity(0.5f);
+  map->addLayer(texLayer);
+
   GDALImageLayer* gif = new GDALImageLayer();
-  gif->setURL("../data/osgearth.gif");
+  gif->setURL(FOLDER + "osgearth.gif");
   gif->setProfile(Profile::create("WGS84", -90.0, 10.0, -80.0, 15.0));
   map->addLayer(gif);
 
   // Add a composite image layer that combines two other sources:
   GDALImageLayer* comp1 = new GDALImageLayer();
-  comp1->setURL("../data/boston-inset-wgs84.tif");
+  comp1->setURL(FOLDER + "boston.tif");
   GDALImageLayer* comp2 = new GDALImageLayer();
-  comp2->setURL("../data/nyc-inset-wgs84.tif");
+  comp2->setURL(FOLDER + "nyc.tif");
   CompositeImageLayer* compImage = new CompositeImageLayer();
   compImage->addLayer(comp1);
   compImage->addLayer(comp2);
   map->addLayer(compImage);
 
-  // Add a composite elevation layer tha tcombines two other sources:
-  GDALElevationLayer* elev1 = new GDALElevationLayer();
-  elev1->setURL("../data/terrain/mt_fuji_90m.tif");
-  GDALElevationLayer* elev2 = new GDALElevationLayer();
-  elev2->setURL("../data/terrain/mt_everest_90m.tif");
-  CompositeElevationLayer* compElev = new CompositeElevationLayer();
-  compElev->addLayer(elev1);
-  compElev->addLayer(elev2);
-  map->addLayer(compElev);
-
-  // mask layer
-  Polygon* maskGeom = new Polygon();
-  maskGeom->push_back(osg::Vec3d(-111.0466, 42.0015, 0));
-  maskGeom->push_back(osg::Vec3d(-111.0467, 40.9979, 0));
-  maskGeom->push_back(osg::Vec3d(-109.0501, 41.0007, 0));
-  maskGeom->push_back(osg::Vec3d(-109.0452, 36.9991, 0));
-  maskGeom->push_back(osg::Vec3d(-114.0506, 37.0004, 0));
-  maskGeom->push_back(osg::Vec3d(-114.0417, 41.9937, 0));
-
-  OGRFeatureSource* maskFeatures = new OGRFeatureSource();
-  maskFeatures->setGeometry(maskGeom);
-  maskFeatures->setProfile(Profile::create(ProfileOptions()));
-
-  if (maskFeatures->open().isOK()) {
-    TerrainConstraintLayer* maskLayer = new TerrainConstraintLayer();
-    maskLayer->setFeatureSource(maskFeatures);
-    map->addLayer(maskLayer);
-  }
-
   // put a model on the map atop Pike's Peak, Colorado, USA
-  osg::ref_ptr<osg::Node> model =
-      osgDB::readRefNodeFile("cow.osgt.(0,0,3).trans.osgearth_shadergen");
+  osg::ref_ptr<osg::Node> model = osgDB::readRefNodeFile(FOLDER + "cow.osgt");
   if (model.valid()) {
     osg::PositionAttitudeTransform* pat = new osg::PositionAttitudeTransform();
     //    pat->addCullCallback(
